@@ -1,2 +1,2 @@
 # KVec
-Kernel Vectorizor
+Kernel Vectorizer
