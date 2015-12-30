@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# stop if webserver is running
+./stop_vp_webserver
+
+# stop if vecparizer backend is running
+./stop_vp_backend
+

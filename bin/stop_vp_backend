@@ -1,0 +1,12 @@
+#!/usr/bin/python
+import os
+import signal
+
+try:
+    fd = open('../.vpbelock', 'r')
+    wspid = fd.read()
+    fd.close()
+    #os.kill(int(wspid), signal.SIGINT)
+    os.kill(-os.getpgid(int(wspid)), signal.SIGINT)
+except:
+    pass

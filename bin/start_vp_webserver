@@ -1,0 +1,47 @@
+#!/usr/bin/python
+
+import os
+import sys
+import fcntl
+import signal
+
+sys.path.insert(0, "../ws")
+import vecpar_webserver
+
+fd = None
+
+def signal_handler(signal, frame):
+    print('Exiting Vecparizer Webserver Service')
+    if not fd is None:
+        unlock_file()
+    vecpar_webserver.stop()
+    sys.exit(0)
+signal.signal(signal.SIGINT, signal_handler)
+
+def lock_file(lockfile):
+    global fd
+
+    fd = open(lockfile, 'w+')
+    fd.write('%d'%os.getpid())
+    fd.flush()
+
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return fd
+    except Exception as e:
+        print e
+        print '%s is locked. Please make sure that previous run of Vecparizer webserver is finished.'%lockfile
+        sys.exit(-1)
+
+def unlock_file():
+    if fd is None: return
+    fcntl.flock(fd, fcntl.LOCK_UN)
+    fd.close()
+
+def main():
+    vecpar_webserver.start()
+
+if __name__ == '__main__':
+    lock_file('../.vpwslock')
+    main()
+    unlock_file()

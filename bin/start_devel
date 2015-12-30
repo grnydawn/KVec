@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# stop if devel is running
+./stop_devel
+
+# start web server
+./start_vp_webserver &
+
+sleep 1
+
+# start vecparizer backend
+./start_vp_backend &
