@@ -1,30 +1,93 @@
+import os, os.path
 import random
+import sqlite3
 import string
+import time
 
 import cherrypy
 
-class StringGenerator(object):
-    @cherrypy.expose
-    def index(self):
-        return """<html>
-          <head></head>
-          <body>
-            <form method="post" action="generate">
-              <input type="text" value="8" name="length" />
-              <button type="submit">Give it now!</button>
-            </form>
-          </body>
-        </html>"""
+script_dir = os.path.dirname(os.path.realpath(__file__))
+DB_STRING = "my.db"
 
-    @cherrypy.expose
-    def generate(self, length=8):
-        return ''.join(random.sample(string.hexdigits, int(length)))
+class StringGenerator(object):
+   @cherrypy.expose
+   def index(self):
+       return open('%s/index.html'%script_dir)
+
+class StringGeneratorWebService(object):
+    exposed = True
+
+    @cherrypy.tools.accept(media='text/plain')
+    def GET(self):
+        with sqlite3.connect(DB_STRING) as c:
+            cherrypy.session['ts'] = time.time()
+            r = c.execute("SELECT value FROM user_string WHERE session_id=?",
+                [cherrypy.session.id])
+            return r.fetchone()
+
+    def POST(self, length=8):
+        some_string = ''.join(random.sample(string.hexdigits, int(length)))
+        with sqlite3.connect(DB_STRING) as c:
+            cherrypy.session['ts'] = time.time()
+            c.execute("INSERT INTO user_string VALUES (?, ?)",
+                [cherrypy.session.id, some_string])
+        return some_string
+
+    def PUT(self, another_string):
+        with sqlite3.connect(DB_STRING) as c:
+            cherrypy.session['ts'] = time.time()
+            c.execute("UPDATE user_string SET value=? WHERE session_id=?",
+                [another_string, cherrypy.session.id])
+
+    def DELETE(self):
+        cherrypy.session.pop('ts', None)
+        with sqlite3.connect(DB_STRING) as c:
+            c.execute("DELETE FROM user_string WHERE session_id=?",
+                [cherrypy.session.id])
+
+def setup_database():
+    """
+    Create the `user_string` table in the database
+    on server startup
+    """
+    with sqlite3.connect(DB_STRING) as con:
+        con.execute("CREATE TABLE user_string (session_id, value)")
+
+def cleanup_database():
+    """
+    Destroy the `user_string` table from the database
+    on server shutdown.
+    """
+    with sqlite3.connect(DB_STRING) as con:
+        print [ str(e) for e in con.execute("select * from user_string") ]
+        con.execute("DROP TABLE user_string")
 
 def start():
-    cherrypy.quickstart(StringGenerator())
+    conf = {
+        '/': {
+            'tools.sessions.on': True,
+            'tools.staticdir.root': script_dir
+        },
+        '/generator': {
+            'request.dispatch': cherrypy.dispatch.MethodDispatcher(),
+            'tools.response_headers.on': True,
+            'tools.response_headers.headers': [('Content-Type', 'text/plain')],
+        },
+        '/static': {
+            'tools.staticdir.on': True,
+            'tools.staticdir.dir': './public'
+        }
+    }
+
+    cherrypy.engine.subscribe('start', setup_database)
+    cherrypy.engine.subscribe('stop', cleanup_database)
+
+    webapp = StringGenerator()
+    webapp.generator = StringGeneratorWebService()
+    cherrypy.quickstart(webapp, '/', conf)
 
 def stop():
     cherrypy.engine.exit()
 
 if __name__ == '__main__':
-    cherrypy.quickstart(StringGenerator())
+    start()
