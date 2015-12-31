@@ -2,15 +2,16 @@
 <html>
    <head>
      <link href="/static/css/style.css" rel="stylesheet">
+     <script type="text/javascript" src="/static/js/upclick.js"></script>
      <script src="http://code.jquery.com/jquery-2.0.3.min.js"></script>
+<!--
      <script type="text/javascript">
        $(document).ready(function() {
 
-         $("#generate-string").click(function(e) {
+         $("#load").click(function(e) {
            $.post("/generator", {"length": $("input[name='length']").val()})
             .done(function(string) {
-               $("#the-string").show();
-               $("#the-string input").val(string);
+               $("#ref").prop('disabled', false);
             });
            e.preventDefault();
          });
@@ -40,15 +41,39 @@
 
        });
      </script>
+-->
+   <script type="text/javascript">
+
+   var uploader = document.getElementById('uploader');
+
+   upclick(
+     {
+      element: uploader,
+      action: '/path_to/you_server_script.php', 
+      onstart:
+        function(filename)
+        {
+          alert('Start upload: '+filename);
+        },
+      oncomplete:
+        function(response_data) 
+        {
+          alert(response_data);
+        }
+     });
+
+   </script>
    </head>
    <body>
-     <input type="text" value="8" name="length" />
-     <button id="generate-string">Give it now!</button>
-     <div id="the-string">
-         <input type="text" />
-         <button id="replace-string">Replace</button>
-         <button id="delete-string">Delete it</button>
-     </div>
+     <input type="button" id="uploader" value="Upload">
+     <button id="ref" disabled>Measure Reference Performance</button>
+     <button id="opt" disabled>Optimize Performance</button>
+     <br> <br>
+     <input id="cmd" type="text" size="80" value="8" name="build" />
+     <br> <br>
+     <textarea id='file' rows="40", cols="80">
+     </textarea>
+
    </body>
 </html>
 

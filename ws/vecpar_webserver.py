@@ -9,6 +9,12 @@ import cherrypy
 script_dir = os.path.dirname(os.path.realpath(__file__))
 DB_STRING = "my.db"
 
+cherrypy.config.update( { \
+    'log.access_file': '%s/access.log'%script_dir, \
+    'log.error_file': '%s/error.log'%script_dir, \
+    'server.socket_port': 8080 \
+})
+
 class StringGenerator(object):
    @cherrypy.expose
    def index(self):
@@ -59,7 +65,6 @@ def cleanup_database():
     on server shutdown.
     """
     with sqlite3.connect(DB_STRING) as con:
-        print [ str(e) for e in con.execute("select * from user_string") ]
         con.execute("DROP TABLE user_string")
 
 def start():
@@ -84,7 +89,12 @@ def start():
 
     webapp = StringGenerator()
     webapp.generator = StringGeneratorWebService()
-    cherrypy.quickstart(webapp, '/', conf)
+
+    cherrypy.tree.mount(webapp, '/', conf)
+
+    cherrypy.engine.start()
+    cherrypy.engine.block()
+    #cherrypy.quickstart(webapp, '/', conf)
 
 def stop():
     cherrypy.engine.exit()
