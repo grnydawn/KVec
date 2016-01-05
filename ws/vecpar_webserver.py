@@ -8,6 +8,7 @@ import cherrypy
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 DB_STRING = "my.db"
+TAB = 4
 
 cherrypy.config.update( { \
     'log.access_file': '%s/access.log'%script_dir, \
@@ -15,41 +16,79 @@ cherrypy.config.update( { \
     'server.socket_port': 8080 \
 })
 
-class StringGenerator(object):
+def strtohtml(line):
+    #dstr = line.decode('utf-8')
+    ostr = ''
+    for c in line:
+        if c==' ':  ostr += '&nbsp;'
+        elif c=='\t': ostr += '&nbsp;'*TAB
+        elif c=='\n': ostr += '<br>\n'
+        else: ostr += c
+    return ostr
+    #return ostr.encode('utf-8')
+
+class Uploader(object):
    @cherrypy.expose
    def index(self):
        return open('%s/index.html'%script_dir)
 
-class StringGeneratorWebService(object):
+class UploaderWebService(object):
     exposed = True
 
     @cherrypy.tools.accept(media='text/plain')
     def GET(self):
-        with sqlite3.connect(DB_STRING) as c:
-            cherrypy.session['ts'] = time.time()
-            r = c.execute("SELECT value FROM user_string WHERE session_id=?",
-                [cherrypy.session.id])
-            return r.fetchone()
+#        with sqlite3.connect(DB_STRING) as c:
+#            cherrypy.session['ts'] = time.time()
+#            r = c.execute("SELECT value FROM user_string WHERE session_id=?",
+#                [cherrypy.session.id])
+#            return r.fetchone()
+        pass
 
-    def POST(self, length=8):
-        some_string = ''.join(random.sample(string.hexdigits, int(length)))
-        with sqlite3.connect(DB_STRING) as c:
-            cherrypy.session['ts'] = time.time()
-            c.execute("INSERT INTO user_string VALUES (?, ?)",
-                [cherrypy.session.id, some_string])
-        return some_string
+    #def POST(self, length=8):
+    def POST(self, **kwargs):
+        #import pdb; pdb.set_trace()
+        for key, value in kwargs.iteritems():
+            if key=='image_file':
+                s = ''
+                if isinstance(value, list):
+                    for part in value:
+                        s += 'Content-Type: %s<br>'%part.headers['Content-Type']
+                        _,_,filename = part.headers['Content-Disposition'].split(';')
+                        s += 'filename: %s<br>'%filename.split('=')[1]
+                        for line in part.file.readlines():
+                            s += strtohtml(line)
+                        s += '<br>\n'
+                else:
+                    s += 'Content-Type: %s<br>'%value.headers['Content-Type']
+                    _,_,filename = value.headers['Content-Disposition'].split(';')
+                    s += 'filename: %s<br>'%filename.split('=')[1]
+                    for line in value.file.readlines():
+                        s += strtohtml(line)
+                        #s += '%s<br>\n'%line
+                    s += '<br>\n'
+
+                return s
+#        length = 8
+#        some_string = ''.join(random.sample(string.hexdigits, int(length)))
+#        with sqlite3.connect(DB_STRING) as c:
+#            cherrypy.session['ts'] = time.time()
+#            c.execute("INSERT INTO user_string VALUES (?, ?)",
+#                [cherrypy.session.id, some_string])
+#        return some_string
 
     def PUT(self, another_string):
-        with sqlite3.connect(DB_STRING) as c:
-            cherrypy.session['ts'] = time.time()
-            c.execute("UPDATE user_string SET value=? WHERE session_id=?",
-                [another_string, cherrypy.session.id])
+#        with sqlite3.connect(DB_STRING) as c:
+#            cherrypy.session['ts'] = time.time()
+#            c.execute("UPDATE user_string SET value=? WHERE session_id=?",
+#                [another_string, cherrypy.session.id])
+        pass
 
     def DELETE(self):
-        cherrypy.session.pop('ts', None)
-        with sqlite3.connect(DB_STRING) as c:
-            c.execute("DELETE FROM user_string WHERE session_id=?",
-                [cherrypy.session.id])
+#        cherrypy.session.pop('ts', None)
+#        with sqlite3.connect(DB_STRING) as c:
+#            c.execute("DELETE FROM user_string WHERE session_id=?",
+#                [cherrypy.session.id])
+        pass
 
 def setup_database():
     """
@@ -73,7 +112,7 @@ def start():
             'tools.sessions.on': True,
             'tools.staticdir.root': script_dir
         },
-        '/generator': {
+        '/upload': {
             'request.dispatch': cherrypy.dispatch.MethodDispatcher(),
             'tools.response_headers.on': True,
             'tools.response_headers.headers': [('Content-Type', 'text/plain')],
@@ -87,8 +126,8 @@ def start():
     cherrypy.engine.subscribe('start', setup_database)
     cherrypy.engine.subscribe('stop', cleanup_database)
 
-    webapp = StringGenerator()
-    webapp.generator = StringGeneratorWebService()
+    webapp = Uploader()
+    webapp.upload = UploaderWebService()
 
     cherrypy.tree.mount(webapp, '/', conf)
 
