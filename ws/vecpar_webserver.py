@@ -1,14 +1,26 @@
 import os, os.path
+import sys
 import random
 import sqlite3
 import string
 import time
 
 import cherrypy
+import Pyro4
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
+backend_dir = '%s/../vb'%script_dir
+sys.path.append(backend_dir)
+
+
 DB_STRING = "my.db"
 TAB = 4
+
+sys.excepthook = Pyro4.util.excepthook
+
+backend = None
+req_filename = None
+req_srclines = None
 
 cherrypy.config.update( { \
     'log.access_file': '%s/access.log'%script_dir, \
@@ -27,7 +39,7 @@ def strtohtml(line):
     return ostr
     #return ostr.encode('utf-8')
 
-class Uploader(object):
+class KVecPortal(object):
    @cherrypy.expose
    def index(self):
        return open('%s/index.html'%script_dir)
@@ -46,9 +58,11 @@ class UploaderWebService(object):
 
     #def POST(self, length=8):
     def POST(self, **kwargs):
+        global req_filename, req_srclines
+
         #import pdb; pdb.set_trace()
         for key, value in kwargs.iteritems():
-            if key=='image_file':
+            if key=='prog_file':
                 s = ''
                 if isinstance(value, list):
                     for part in value:
@@ -59,12 +73,19 @@ class UploaderWebService(object):
                             s += strtohtml(line)
                         s += '<br>\n'
                 else:
-                    s += 'Content-Type: %s<br>'%value.headers['Content-Type']
-                    _,_,filename = value.headers['Content-Disposition'].split(';')
-                    s += 'filename: %s<br>'%filename.split('=')[1]
-                    for line in value.file.readlines():
-                        s += strtohtml(line)
-                        #s += '%s<br>\n'%line
+                    if value.file is None:
+                        s = 'No file is uploaded.<br>\n'
+                    else:
+                        content_type = value.headers['Content-Type']
+                        _,_,filename = value.headers['Content-Disposition'].split(';')
+                        if content_type==u'text/x-fortran':
+                            req_filename = filename
+                            req_srclines = value.file.readlines()
+
+                        s += 'Content-Type: %s<br>'%content_type
+                        _,_,filename = value.headers['Content-Disposition'].split(';')
+                        s += 'filename: %s<br>'%filename.split('=')[1]
+                        s += strtohtml(req_srclines)
                     s += '<br>\n'
 
                 return s
@@ -90,6 +111,25 @@ class UploaderWebService(object):
 #                [cherrypy.session.id])
         pass
 
+class BuilderWebService(object):
+
+    @cherrypy.expose
+    def index(self, **kwargs):
+
+        ret_str = 'Unknown command: %s'%str(kwargs)
+        if 'build' in kwargs:
+            if req_srclines:
+                backend.create_order('build', req_filename, req_srclines, kwargs['build'])
+                ret_str = backend.get_order_status('build')
+        elif 'getinfo' in kwargs:
+            req = kwargs['getinfo']
+            if req=='ref_result':
+                ret_str = backend.get_order_status('build')
+
+        #import pdb; pdb.set_trace()
+        return ret_str
+
+
 def setup_database():
     """
     Create the `user_string` table in the database
@@ -107,6 +147,8 @@ def cleanup_database():
         con.execute("DROP TABLE user_string")
 
 def start():
+    global backend
+
     conf = {
         '/': {
             'tools.sessions.on': True,
@@ -114,6 +156,10 @@ def start():
         },
         '/upload': {
             'request.dispatch': cherrypy.dispatch.MethodDispatcher(),
+            'tools.response_headers.on': True,
+            'tools.response_headers.headers': [('Content-Type', 'text/plain')],
+        },
+        '/execute': {
             'tools.response_headers.on': True,
             'tools.response_headers.headers': [('Content-Type', 'text/plain')],
         },
@@ -126,10 +172,14 @@ def start():
     cherrypy.engine.subscribe('start', setup_database)
     cherrypy.engine.subscribe('stop', cleanup_database)
 
-    webapp = Uploader()
+    webapp = KVecPortal()
     webapp.upload = UploaderWebService()
+    webapp.execute = BuilderWebService()
 
     cherrypy.tree.mount(webapp, '/', conf)
+
+    ns = Pyro4.locateNS()
+    backend = Pyro4.Proxy("PYRONAME:kvec.backend")
 
     cherrypy.engine.start()
     cherrypy.engine.block()

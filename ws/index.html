@@ -6,21 +6,35 @@
         <script src="/static/js/script.js"></script>
     </head>
     <body>
+		<!--
         <header>
             <h2>Pure HTML5 file upload</h2>
             <a href="http://localhost:8080/" class="stuts">Home</a>
         </header>
+		-->
         <div class="container">
-            <div class="contr"><h2>You can select the file (image) and click Upload button</h2></div>
+            <div class="contr"><h2>Automated Fortran Performance Optimization</h2></div>
 
             <div class="upload_form_cont">
                 <form id="upload_form" enctype="multipart/form-data" method="post" action="upload">
                     <div>
-                        <div><label for="image_file">Please select image file</label></div>
-                        <div><input type="file" name="image_file" id="image_file" onchange="fileSelected();" multiple="multiple"/></div>
+                        <div><label for="prog_file">Please select Fortran source file</label></div>
+                        <div><input type="file" name="prog_file" id="prog_file" onchange="fileSelected();" multiple="multiple"/>
+                        <input id="upload_btn" type="button" value="Upload" onclick="startUploading()" disabled/></div>
                     </div>
                     <div>
-                        <input type="button" value="Upload" onclick="startUploading()" />
+                        <div><label for="compile_cmd">Please enter build commands</label></div>
+                        <div><input id="compile_cmd" type="text" disabled/>
+                        <input id="execute_btn" type="button" value="Execute" onclick="executeProgram()" disabled/></div>
+						<br>
+                        <div id="ref_perf"></div>
+                        <div id="ref_perf_wait"></div>
+                    </div>
+					<br>
+					<br>
+                    <div>
+                        <div><label for="optimize_btn">Please press button to optimize</label></div>
+                        <input id="optimize_btn" type="button" value="Optimize" onclick="optimizeProgram()" disabled/>
                     </div>
                     <div id="fileinfo">
                         <div id="filename"></div>
@@ -28,7 +42,7 @@
                         <div id="filetype"></div>
                         <div id="filedim"></div>
                     </div>
-                    <div id="error">You should select valid image files only!</div>
+                    <div id="error">You should select valid Fortran source files only!</div>
                     <div id="error2">An error occurred while uploading the file</div>
                     <div id="abort">The upload has been canceled by the user or the browser dropped the connection</div>
                     <div id="warnsize">Your file is very big. We can't accept it. Please select more small file</div>
@@ -46,8 +60,6 @@
                         <div id="upload_response"></div>
                     </div>
                 </form>
-
-                <img id="preview" />
             </div>
         </div>
     </body>
